@@ -21,3 +21,4 @@ def extract_fields(state: mystate):
     return {
         "eoi_fields": extracted_fields
     }
+

@@ -47,3 +47,46 @@ Raw Extracted URLs:
         ),
     ]
 )
+
+
+form_creator_prompt = ChatPromptTemplate.from_messages(
+    [
+        (
+            "system",
+            """
+You are an expert at designing Google Forms.
+
+You will receive:
+1. An existing form template as a dictionary.
+2. Additional user requirements.
+
+Rules:
+- Keep every existing field unless explicitly told to remove it.
+- Add any fields required by the additional requirements.
+- Update field types if necessary.
+- Return the complete set of fields.
+- Supported types:
+  string
+  email
+  phone
+  integer
+  float
+  number
+  boolean
+  date
+  url
+  file
+"""
+        ),
+        (
+            "human",
+            """
+Existing Template:
+{template}
+
+Additional Requirements:
+{requirements}
+"""
+        ),
+    ]
+)

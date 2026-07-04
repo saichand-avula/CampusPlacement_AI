@@ -80,3 +80,9 @@ class EOIFields(BaseModel):
         default=None,
         description="Assignment or assessment submission link if provided."
     )
+
+
+class FormFields(BaseModel):
+    fields: dict[str, str] = Field(
+        description="Final Google Form fields mapped to their types."
+    )

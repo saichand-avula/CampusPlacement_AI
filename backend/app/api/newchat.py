@@ -1,7 +1,7 @@
 from fastapi import APIRouter, UploadFile, File, Form
 from pathlib import Path
 import shutil
-from graphs.graph import graph
+from graphs.graph import get_graph
 
 router = APIRouter()
 
@@ -33,10 +33,14 @@ async def new_chat(
         "thread_id": thread_id,
         "deadline": deadline,
         "jd_path": str(jd_path),
+        "user_id":"user1",
+        "form_template_name":"basic_template",
+        "additional_form_requirements":"keep github link feild"
     }
 
     # Run the graph
-    final_state = graph.invoke(initial_state)
+    graph = get_graph()
+    final_state = await graph.ainvoke(initial_state)
 
     return {
         "thread_id": thread_id,
