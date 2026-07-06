@@ -4,17 +4,25 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.newchat import router as newchat_router
-from graphs.sqlliteconnection import init_store, close_store
+from store_connection import init_store, close_store
+from sqllite_connection import init_database,close_database
 from graphs.graph import init_graph
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    store = await init_store()
-    init_graph(store)
-    yield
-    await close_store()
 
+    store = await init_store()
+
+    init_database()
+
+    init_graph(store)
+
+    yield
+
+    close_database()
+
+    await close_store()
 
 app = FastAPI(lifespan=lifespan)
 

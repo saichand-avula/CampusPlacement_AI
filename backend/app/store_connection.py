@@ -1,14 +1,20 @@
+from pathlib import Path
+
 from langgraph.store.sqlite import AsyncSqliteStore
 
 _store = None
 _store_ctx = None
+
+DB_PATH = Path(__file__).resolve().parents[1] / "memory.db"
 
 
 async def init_store():
     global _store, _store_ctx
 
     if _store is None:
-        _store_ctx = AsyncSqliteStore.from_conn_string("memory.db")
+        _store_ctx = AsyncSqliteStore.from_conn_string(
+            str(DB_PATH)
+        )
         _store = await _store_ctx.__aenter__()
         await _store.setup()
 
