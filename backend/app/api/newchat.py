@@ -1,48 +1,63 @@
-from fastapi import APIRouter, UploadFile, File, Form
-from pathlib import Path
-import shutil
-from graphs.graph import get_graph
+from fastapi import APIRouter, Form
+from sqllite_connection import get_connection
+import uuid
 
 router = APIRouter()
 
 
-def getthreadid():
-    return "1"
+def create_thread() -> str:
+    thread_id = str(uuid.uuid4())
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        INSERT INTO chats (thread_id, user_id)
+        VALUES (?, ?)
+        """,
+        (thread_id, "1")  # TODO: Replace with logged-in user_id
+    )
+
+    conn.commit()
+    conn.close()
+
+    return thread_id
 
 
 @router.post("/newchat")
 async def new_chat(
-    deadline: str = Form(...),
-    jd: UploadFile = File(...)
+    message: str = Form(...),
 ):
+    # Create a new chat
+    thread_id = create_thread()
 
-    thread_id = getthreadid()
+    # Save the first user message
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    # Create public/<thread_id>/
-    upload_dir = Path("public") / thread_id
-    upload_dir.mkdir(parents=True, exist_ok=True)
+    cursor.execute(
+        """
+        INSERT INTO messages (thread_id, role, content)
+        VALUES (?, ?, ?)
+        """,
+        (
+            thread_id,
+            "user",
+            message,
+        ),
+    )
 
-    extension = Path(jd.filename).suffix
-    jd_path = upload_dir / f"jd{extension}"
+    conn.commit()
+    conn.close()
 
-    with open(jd_path, "wb") as buffer:
-        shutil.copyfileobj(jd.file, buffer)
-
-    # Initial graph state
-    initial_state = {
-        "thread_id": thread_id,
-        "deadline": deadline,
-        "jd_path": str(jd_path),
-        "user_id":"user1",
-        "form_template_name":"basic_template",
-        "additional_form_requirements":"keep github link feild"
-    }
-
-    # Run the graph
-    graph = get_graph()
-    final_state = await graph.ainvoke(initial_state)
+    # TODO:
+    # response = graph.invoke({
+    #     "thread_id": thread_id,
+    #     "messages": [HumanMessage(content=message)]
+    # })
 
     return {
         "thread_id": thread_id,
-        "state": final_state
+        "status": "success",
     }
