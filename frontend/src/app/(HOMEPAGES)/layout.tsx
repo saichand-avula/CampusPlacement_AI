@@ -1,13 +1,9 @@
 
 
-export default function RootLayout({
+export default function HomepagesLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <html>
-      <body >{children}</body>
-    </html>
-  );
+  return <>{children}</>;
 }

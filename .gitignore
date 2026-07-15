@@ -52,3 +52,12 @@ backend/.mypy_cache/
 backend/public/*
 !backend/public/.gitkeep
 backend/secrets/
+
+# ======================
+# Databases
+# ======================
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3

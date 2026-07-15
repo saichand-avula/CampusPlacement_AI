@@ -29,7 +29,7 @@ from assistant.assistant_nodes.long_term_memory import (
 _graph = None
 
 
-def init_graph(store):
+def init_graph(store, checkpointer=None):
 
     global _graph
 
@@ -92,6 +92,7 @@ def init_graph(store):
 
     _graph = builder.compile(
         store=store,
+        checkpointer=checkpointer,
     )
 
 
