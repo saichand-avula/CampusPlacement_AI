@@ -10,8 +10,6 @@ from langgraph.prebuilt import (
 
 from assistant.assistant_state import AssistantState
 
-
-
 from assistant.assistant_nodes.assistant import (
     assistant_node,
     tools,
@@ -19,10 +17,6 @@ from assistant.assistant_nodes.assistant import (
 
 from assistant.assistant_nodes.short_term_memory import (
     short_term_memory,
-)
-
-from assistant.assistant_nodes.long_term_memory import (
-    long_term_memory,
 )
 
 
@@ -50,11 +44,6 @@ def init_graph(store, checkpointer=None):
         short_term_memory,
     )
 
-    builder.add_node(
-        "long_term_memory",
-        long_term_memory,
-    )
-
     builder.add_edge(
         START,
         "assistant",
@@ -76,17 +65,7 @@ def init_graph(store, checkpointer=None):
     )
 
     builder.add_edge(
-        "assistant",
-        "long_term_memory",
-    )
-
-    builder.add_edge(
         "short_term_memory",
-        END,
-    )
-
-    builder.add_edge(
-        "long_term_memory",
         END,
     )
 

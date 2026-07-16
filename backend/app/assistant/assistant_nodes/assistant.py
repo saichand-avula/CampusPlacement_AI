@@ -1,18 +1,23 @@
 from langchain_core.messages import BaseMessage, SystemMessage
-from langgraph.runtime import Runtime
 
 from assistant.assistant_state import AssistantState
 from assistant.llm import llm
 from assistant.prompts import (
     SYSTEM_PROMPT,
     SHORT_TERM_MEMORY_CONTEXT,
-    LONG_TERM_MEMORY_CONTEXT,
+    USER_PROFILE_CONTEXT,
 )
 from assistant.tools.template_creator import create_template
+from assistant.tools.workflow_tools import (
+    check_workflow_status,
+    update_assistant_state,
+)
 
 
 tools = [
     create_template,
+    check_workflow_status,
+    update_assistant_state,
 ]
 
 assistant_llm = llm.bind_tools(tools)
@@ -45,51 +50,35 @@ def _normalize_content(msg: BaseMessage) -> BaseMessage:
         normalized = str(content)
 
     # Return a shallow copy with corrected content
-    msg = msg.copy()
-    msg.content = normalized
-    return msg
+    # Use model_copy (Pydantic v2) with fallback to copy (Pydantic v1)
+    try:
+        return msg.model_copy(update={"content": normalized})
+    except AttributeError:
+        copied = msg.copy()
+        object.__setattr__(copied, "content", normalized)
+        return copied
 
 
-async def assistant_node(
-    state: AssistantState,
-    runtime: Runtime,
-):
+async def assistant_node(state: AssistantState):
 
     messages = [
-        SystemMessage(
-            content=SYSTEM_PROMPT
-        )
+        SystemMessage(content=SYSTEM_PROMPT)
     ]
 
     # -----------------------
-    # Long-Term Memory
+    # Static User Profile
+    # User 1 defaults: name=saichand, default template=basic template
     # -----------------------
-
-    memories = await runtime.store.asearch(
-        ("1", "longterm_memory")
+    messages.append(
+        SystemMessage(
+            content=USER_PROFILE_CONTEXT
+        )
     )
 
-    if memories:
-
-        memory_text = "\n".join(
-            f"- {memory.value['content']}"
-            for memory in memories
-        )
-
-        messages.append(
-            SystemMessage(
-                content=LONG_TERM_MEMORY_CONTEXT.format(
-                    memories=memory_text
-                )
-            )
-        )
-
     # -----------------------
-    # Short-Term Memory
+    # Short-Term Memory (conversation summary)
     # -----------------------
-
     if state.get("summary"):
-
         messages.append(
             SystemMessage(
                 content=SHORT_TERM_MEMORY_CONTEXT.format(
@@ -103,7 +92,6 @@ async def assistant_node(
     # Normalize content to strings — required by OpenAI-compatible APIs
     # (Sarvam AI rejects list/None content that Gemini silently accepted)
     # -----------------------
-
     messages.extend(
         _normalize_content(m) for m in state["messages"]
     )
