@@ -1,11 +1,14 @@
 from typing import Annotated, Optional
 
 from langchain_core.messages import ToolMessage
+from langchain_core.runnables import RunnableConfig
 from langchain_core.tools import tool, InjectedToolCallId
-from langgraph.prebuilt import InjectedState
+from langgraph.prebuilt import InjectedState, InjectedStore
+from langgraph.store.base import BaseStore
 from langgraph.types import Command
 
 from assistant.assistant_state import AssistantState
+from graphs.graph import get_graph
 
 
 # ──────────────────────────────────────────────
@@ -212,6 +215,197 @@ async def update_assistant_state(
             "messages": [
                 ToolMessage(
                     content=summary,
+                    tool_call_id=tool_call_id,
+                )
+            ],
+        }
+    )
+
+
+# ──────────────────────────────────────────────
+# Tool: initialize_workflow
+# ──────────────────────────────────────────────
+
+@tool
+async def initialize_workflow(
+    tool_call_id: Annotated[str, InjectedToolCallId],
+    state: Annotated[AssistantState, InjectedState],
+    store: Annotated[BaseStore, InjectedStore],
+    config: RunnableConfig,
+) -> Command:
+    """
+    Initializes the placement workflow by mapping the current assistant
+    state into the workflow graph and running it.
+
+    Before initializing:
+      1. Checks that a JD has been uploaded (initial_jd_path must be set).
+         If not, returns a signal so the frontend can show the upload popup.
+      2. Resolves the form template:
+         a. Uses initial_form_template_name if already set.
+         b. Falls back to long-term memory (category "template_preference").
+         c. If neither exists, asks the user to create/choose a template.
+      3. Verifies the resolved template exists for this user in the store.
+         If the name is given by user but not found, asks user to create it first.
+      4. Maps all initial_* fields from AssistantState → mystate.
+      5. Invokes the workflow graph using the same thread_id as the assistant.
+      6. Sets workflow_initialized = True.
+
+    Call this when the user says "start workflow", "initialize workflow",
+    "create workflow", "run the placement drive", or similar.
+    """
+    # ── Guard: already initialized ────────────────────────────
+    if state.get("workflow_initialized", False):
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content="Workflow is already initialized. No action taken.",
+                        tool_call_id=tool_call_id,
+                    )
+                ]
+            }
+        )
+
+    # ── Hardcoded user_id (same as rest of the system) ────────
+    user_id = "1"
+    # Read thread_id from the LangGraph config (it's NEVER in state values)
+    thread_id = config["configurable"].get("thread_id", "")
+
+    # ── Gate 1: JD must be uploaded ───────────────────────────
+    jd_path = state.get("initial_jd_path")
+    if not jd_path:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content=(
+                            '{"requires": "jd_upload", '
+                            '"message": "A Job Description (JD) file is required before '
+                            'the workflow can be initialized. Please upload the JD PDF."}'
+                        ),
+                        tool_call_id=tool_call_id,
+                    )
+                ]
+            }
+        )
+
+    # ── Gate 2: Resolve form template ─────────────────────────
+    template_name = state.get("initial_form_template_name")
+
+    # 2a. If not in state, look in long-term memory
+    if not template_name:
+        memory_items = await store.asearch(
+            (user_id, "longterm_memory"),
+            query="template preference",
+        )
+        for item in memory_items:
+            if item.value.get("category") == "template_preference":
+                template_name = item.value.get("content", "").strip()
+                break
+
+    # 2b. If still none → use hardcoded default "basic template"
+    #     (The system profile always sets this as the default for the user.)
+    if not template_name:
+        template_name = "basic template"
+
+    # 2c. Verify the template exists for this user in the store
+    existing_templates = await store.asearch((user_id, "templates"))
+    template_names = [item.key for item in existing_templates]
+
+    if template_name not in template_names:
+        # Template name is set but not yet created → ask user to create it
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content=(
+                            '{"requires": "template", '
+                            f'"message": "Template \'{template_name}\' has not been created yet. '
+                            'Please create it first by telling me what fields you want in the form."}'
+                        ),
+                        tool_call_id=tool_call_id,
+                    )
+                ]
+            }
+        )
+
+    # ── Build workflow input (AssistantState → mystate) ───────
+    # Core fields
+    workflow_input: dict = {
+        "user_id": user_id,
+        "thread_id": thread_id,
+        "jd_path": jd_path,
+        "deadline": state.get("initial_deadline") or "",
+        "form_template_name": template_name,
+        "additional_form_requirements": state.get("initial_additional_form_requirements") or "",
+        # Pass user-provided values as preset_* so EOI extractor respects them
+        "preset_company_name": state.get("initial_company_name"),
+        "preset_job_title": state.get("initial_job_title"),
+        "preset_employment_type": state.get("initial_employment_type"),
+        "preset_work_location": state.get("initial_work_location"),
+        "preset_stipend": state.get("initial_stipend"),
+        "preset_ctc": state.get("initial_ctc"),
+        "preset_duration": state.get("initial_duration"),
+        "preset_eligibility": state.get("initial_eligibility"),
+        "preset_branches": state.get("initial_branches"),
+        "preset_company_website": state.get("initial_company_website"),
+        "preset_linkedin_link": state.get("initial_linkedin_link"),
+    }
+
+    # ── Run workflow graph ─────────────────────────────────────
+    # Use a prefixed thread_id to avoid checkpointer conflicts
+    # with the assistant graph which shares the same SQLite DB.
+    wf_graph = get_graph()
+    wf_config = {"configurable": {"thread_id": f"wf_{thread_id}"}}
+
+    try:
+        final_state: dict = await wf_graph.ainvoke(workflow_input, config=wf_config)
+    except Exception as exc:
+        return Command(
+            update={
+                "messages": [
+                    ToolMessage(
+                        content=f"Workflow failed to start: {str(exc)}",
+                        tool_call_id=tool_call_id,
+                    )
+                ]
+            }
+        )
+
+    # ── Serialize result and persist to store ─────────────────
+    # ainvoke returns the final state dict. Serialize Pydantic
+    # models so the store (which uses JSON) can hold them.
+    serializable: dict = {}
+    for k, v in final_state.items():
+        if hasattr(v, "model_dump"):
+            serializable[k] = v.model_dump()
+        elif isinstance(v, list):
+            serializable[k] = [
+                item.model_dump() if hasattr(item, "model_dump") else item
+                for item in v
+            ]
+        else:
+            serializable[k] = v
+
+    # Store result under (user_id, "workflow_results") keyed by thread_id
+    await store.aput(
+        (user_id, "workflow_results"),
+        thread_id,
+        serializable,
+    )
+
+    # ── Mark workflow as initialized in assistant state ────────
+    return Command(
+        update={
+            "workflow_initialized": True,
+            "initial_form_template_name": template_name,
+            "messages": [
+                ToolMessage(
+                    content=(
+                        '{"status": "workflow_started", '
+                        f'"template": "{template_name}", '
+                        f'"jd_path": "{jd_path}"}}'
+                    ),
                     tool_call_id=tool_call_id,
                 )
             ],

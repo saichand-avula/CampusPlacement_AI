@@ -11,6 +11,7 @@ from assistant.tools.template_creator import create_template
 from assistant.tools.workflow_tools import (
     check_workflow_status,
     update_assistant_state,
+    initialize_workflow,
 )
 
 
@@ -18,6 +19,7 @@ tools = [
     create_template,
     check_workflow_status,
     update_assistant_state,
+    initialize_workflow,
 ]
 
 assistant_llm = llm.bind_tools(tools)

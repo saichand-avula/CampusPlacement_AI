@@ -5,6 +5,9 @@ from langchain_core.tools import tool
 from langgraph.prebuilt import InjectedStore
 from langgraph.store.base import BaseStore
 
+# Hardcoded user_id — the whole system currently operates as user "1"
+_USER_ID = "1"
+
 
 class FormField(BaseModel):
     label: str = Field(
@@ -31,30 +34,25 @@ class FormField(BaseModel):
 
     options: list[str] = Field(
         default_factory=list,
-        description="Options for dropdown, multiple choice or checkboxes."
+        description="Options for dropdown, multiple choice or checkboxes.",
     )
 
 
 @tool
 async def create_template(
-    user_id: str,
     template_name: str,
     fields: list[FormField],
     store: Annotated[BaseStore, InjectedStore],
 ) -> str:
     """
-    Creates or updates a reusable Google Form template.
+    Creates or updates a reusable Google Form template for the current user.
 
     Args:
-        user_id: Owner of the template.
-        template_name: Template name.
-        fields: Google Form fields.
+        template_name: Name of the template (e.g. "basic template").
+        fields: List of Google Form fields to include.
     """
 
-    namespace = (
-        user_id,
-        "templates",
-    )
+    namespace = (_USER_ID, "templates")
 
     await store.aput(
         namespace,
@@ -67,7 +65,4 @@ async def create_template(
         },
     )
 
-    return (
-        f"Template '{template_name}' "
-        "saved successfully."
-    )
+    return f"Template '{template_name}' saved successfully under user {_USER_ID}."

@@ -19,10 +19,10 @@ builder.add_edge("form_feilds_extractor", END)
 _graph = None
 
 
-def init_graph(store):
+def init_graph(store, checkpointer=None):
     global _graph
 
-    _graph = builder.compile(store=store)
+    _graph = builder.compile(store=store, checkpointer=checkpointer)
 
 
 def get_graph():

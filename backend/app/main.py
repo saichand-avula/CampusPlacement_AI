@@ -3,8 +3,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.newchat import router as newchat_router
 from api.chat import router as chat_router
+from api.upload import router as upload_router
 from store_connection import init_store, close_store
 from sqllite_connection import init_database, close_database
 from checkpoint_connection import init_checkpointer, close_checkpointer
@@ -18,8 +18,8 @@ async def lifespan(app: FastAPI):
 
     init_database()
 
-    init_graph(store)                        # workflow graph
-    init_assistant_graph(store, checkpointer) # assistant graph
+    init_graph(store, checkpointer=None)              # workflow graph — NO checkpointer (avoids SQLite lock deadlock)
+    init_assistant_graph(store, checkpointer)          # assistant graph — uses checkpointer for persistence
 
     yield
 
@@ -37,5 +37,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(newchat_router)
 app.include_router(chat_router)
+app.include_router(upload_router)
