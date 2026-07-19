@@ -1,4 +1,6 @@
-from langchain_core.messages import BaseMessage, SystemMessage
+import json
+
+from langchain_core.messages import BaseMessage, SystemMessage, AIMessage, ToolMessage
 
 from assistant.assistant_state import AssistantState
 from assistant.llm import llm
@@ -8,6 +10,7 @@ from assistant.prompts import (
     USER_PROFILE_CONTEXT,
 )
 from assistant.tools.template_creator import create_template
+from assistant.tools.template_retriver import fetchtemplates
 from assistant.tools.workflow_tools import (
     check_workflow_status,
     update_assistant_state,
@@ -20,9 +23,48 @@ tools = [
     check_workflow_status,
     update_assistant_state,
     initialize_workflow,
+    fetchtemplates,
 ]
 
 assistant_llm = llm.bind_tools(tools)
+
+
+# ──────────────────────────────────────────────
+# Hardcoded responses for known tool signals
+# The LLM must never be allowed to craft these
+# responses freely — it always adds extra text.
+# ──────────────────────────────────────────────
+
+_FIXED_RESPONSES: dict[str, str] = {
+    "jd_upload":        "Please upload the JD PDF using the upload button above.",
+    "template":         "You have no saved templates. Please create one first.",
+    "workflow_started": "Done! The workflow is running — check the panel on the right for results.",
+}
+
+
+def _check_fixed_response(messages: list[BaseMessage]) -> str | None:
+    """
+    Scan the last ToolMessage for a known JSON signal.
+    Returns the hardcoded reply string if found, else None.
+    """
+    for msg in reversed(messages):
+        if not isinstance(msg, ToolMessage):
+            break
+        try:
+            data = json.loads(msg.content)
+        except (json.JSONDecodeError, TypeError):
+            continue
+
+        if isinstance(data, dict):
+            requires = data.get("requires")
+            status   = data.get("status")
+
+            if requires in _FIXED_RESPONSES:
+                return _FIXED_RESPONSES[requires]
+            if status in _FIXED_RESPONSES:
+                return _FIXED_RESPONSES[status]
+
+    return None
 
 
 def _normalize_content(msg: BaseMessage) -> BaseMessage:
@@ -62,6 +104,16 @@ def _normalize_content(msg: BaseMessage) -> BaseMessage:
 
 
 async def assistant_node(state: AssistantState):
+
+    # ── Programmatic intercept ──────────────────────────────────
+    # If the last tool call returned a known JSON signal, bypass the
+    # LLM entirely and return the exact hardcoded message.
+    # This prevents the model from appending "company name / deadline"
+    # or any other free-form text to these fixed responses.
+    fixed = _check_fixed_response(state["messages"])
+    if fixed:
+        return {"messages": [AIMessage(content=fixed)]}
+    # ────────────────────────────────────────────────────────────
 
     messages = [
         SystemMessage(content=SYSTEM_PROMPT)

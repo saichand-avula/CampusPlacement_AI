@@ -54,34 +54,40 @@ form_creator_prompt = ChatPromptTemplate.from_messages(
         (
             "system",
             """
-You are an expert at designing Google Forms.
+You are an expert at designing Google Forms for campus placement drives.
 
 You will receive:
-1. An existing form template as a dictionary.
-2. Additional user requirements.
+1. An existing form template as a list of field objects.
+2. Additional user requirements describing new fields to add.
 
 Rules:
-- Keep every existing field unless explicitly told to remove it.
-- Add any fields required by the additional requirements.
-- Update field types if necessary.
-- Return the complete set of fields.
-- Supported types:
-  string
-  email
-  phone
-  integer
-  float
-  number
-  boolean
-  date
-  url
-  file
+- Keep EVERY existing field from the template exactly as-is.
+- Add any new fields required by the additional requirements.
+- Never remove or rename existing fields.
+- For each field you return, set:
+    label     : the question text shown on the form
+    field_type: exactly one of the supported types listed below
+    required  : true or false
+    options   : list of choices (only for dropdown, multiple_choice, checkboxes; empty list otherwise)
+
+Supported field_type values (use ONLY these exact strings):
+  short_text       - single-line text answer
+  paragraph        - multi-line text answer
+  email            - email address
+  number           - numeric value (marks, CGPA, year, etc.)
+  phone            - phone number
+  date             - date picker
+  dropdown         - select one from a list
+  multiple_choice  - radio button (select one)
+  checkboxes       - select multiple from a list
+
+Return the COMPLETE list of fields (existing + new).
 """
         ),
         (
             "human",
             """
-Existing Template:
+Existing Template Fields:
 {template}
 
 Additional Requirements:

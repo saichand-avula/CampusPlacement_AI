@@ -29,6 +29,7 @@ async def create_form(state: mystate, runtime: Runtime):
         )
 
     template_fields = template.value["fields"]
+    # template_fields is already a list of dicts: {label, field_type, required, options}
 
     additional_req = state.get("additional_form_requirements", "").strip()
 
@@ -37,13 +38,15 @@ async def create_form(state: mystate, runtime: Runtime):
             "form_fields": template_fields
         }
 
-    updated_fields = form_creator_chain.invoke(
+    # Merge extra fields on top of the template using the LLM
+    updated_fields: FormFields = await form_creator_chain.ainvoke(
         {
             "template": template_fields,
             "requirements": additional_req,
         }
     )
 
+    # Serialize FormFieldItem objects → plain dicts for state storage
     return {
-        "form_fields": updated_fields.fields
+        "form_fields": [f.model_dump() for f in updated_fields.fields]
     }

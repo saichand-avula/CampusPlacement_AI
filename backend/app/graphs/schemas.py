@@ -82,7 +82,24 @@ class EOIFields(BaseModel):
     )
 
 
+class FormFieldItem(BaseModel):
+    """A single Google Form field, matching the template store format."""
+    label: str = Field(description="Question shown on the Google Form.")
+    field_type: str = Field(
+        description=(
+            "Google Form question type. Must be one of: "
+            "short_text, paragraph, email, number, phone, date, "
+            "dropdown, multiple_choice, checkboxes."
+        )
+    )
+    required: bool = Field(description="Whether answering this question is mandatory.")
+    options: list[str] = Field(
+        default_factory=list,
+        description="Options for dropdown, multiple_choice, or checkboxes fields.",
+    )
+
+
 class FormFields(BaseModel):
-    fields: dict[str, str] = Field(
-        description="Final Google Form fields mapped to their types."
+    fields: list[FormFieldItem] = Field(
+        description="Complete list of Google Form fields (existing + any new ones added)."
     )
