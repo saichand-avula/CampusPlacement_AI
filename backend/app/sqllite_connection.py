@@ -3,7 +3,7 @@ import sqlite3
 
 _connection = None
 
-DB_PATH = Path(__file__).resolve().parents[1] / "memory.db"
+DB_PATH = Path(__file__).resolve().parents[1] / "chats.db"
 
 
 def init_database():

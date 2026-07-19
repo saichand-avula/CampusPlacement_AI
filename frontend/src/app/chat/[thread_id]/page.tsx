@@ -76,8 +76,10 @@ export default function ThreadPage({ params }: Props) {
           setLocalJdPath(aState.initial_jd_path);
         }
 
-        // If workflow is initialized, fetch workflow state
-        if (aState.workflow_initialized && (triggerWorkflowFetch || !workflowState)) {
+        // Always try fetching workflow results on mount or after a message.
+        // The workflow_initialized flag can be lost after a server restart,
+        // but store results survive — so check the store directly too.
+        if (triggerWorkflowFetch || !workflowState) {
           fetchWorkflowState();
         }
       } catch {
@@ -135,7 +137,9 @@ export default function ThreadPage({ params }: Props) {
     console.log(`JD uploaded: ${filename} → ${jdPath}`);
   };
 
-  const workflowInitialized = assistantState?.workflow_initialized ?? false;
+  // Treat as initialized if the flag is set OR if we already have workflow results
+  // (results survive server restarts even when the checkpointer flag is lost)
+  const workflowInitialized = (assistantState?.workflow_initialized ?? false) || !!workflowState;
   const effectiveJdPath = localJdPath || assistantState?.initial_jd_path || null;
 
   return (
