@@ -20,8 +20,13 @@ interface UseChatReturn {
 export function useChat(threadId?: string): UseChatReturn {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  // Start as true when threadId is present so the pending-message effect
+  // waits until the initial fetchMessages finishes before sending.
+  const [isLoading, setIsLoading] = useState(!!threadId);
   const scrollRef = useRef<HTMLDivElement | null>(null);
+  // Ref so the fetchMessages effect can check streaming state without
+  // needing isStreaming in its dependency array (avoids re-runs mid-stream).
+  const isStreamingRef = useRef(false);
 
   // ── Load existing messages ───────────────
   useEffect(() => {
@@ -37,7 +42,13 @@ export function useChat(threadId?: string): UseChatReturn {
       setIsLoading(true);
       try {
         const data = await fetchMessages(threadId);
-        if (!cancelled) setMessages(data);
+        if (!cancelled) {
+          // Don't overwrite messages if we're currently streaming
+          // (the pending-message send may have already started).
+          if (!isStreamingRef.current) {
+            setMessages(data);
+          }
+        }
       } catch (err) {
         console.error("Failed to load messages:", err);
       } finally {
@@ -82,6 +93,7 @@ export function useChat(threadId?: string): UseChatReturn {
       };
 
       setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      isStreamingRef.current = true;
       setIsStreaming(true);
 
       await streamMessage(
@@ -90,8 +102,11 @@ export function useChat(threadId?: string): UseChatReturn {
         // onToken
         (token) => {
           setMessages((prev) => {
+            if (prev.length === 0) return prev;
             const updated = [...prev];
             const last = updated[updated.length - 1];
+            // Guard: last must exist and have a string content property
+            if (!last || typeof last.content !== "string") return prev;
             updated[updated.length - 1] = {
               ...last,
               content: last.content + token,
@@ -101,6 +116,7 @@ export function useChat(threadId?: string): UseChatReturn {
         },
         // onDone
         () => {
+          isStreamingRef.current = false;
           setIsStreaming(false);
         },
         // onError
@@ -115,6 +131,7 @@ export function useChat(threadId?: string): UseChatReturn {
             };
             return updated;
           });
+          isStreamingRef.current = false;
           setIsStreaming(false);
         }
       );

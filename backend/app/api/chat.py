@@ -94,13 +94,31 @@ async def get_assistant_state(thread_id: str):
         "initial_company_name": values.get("initial_company_name"),
         "initial_form_template_name": values.get("initial_form_template_name"),
         "initial_deadline": values.get("initial_deadline"),
-        "initial_job_title": values.get("initial_job_title"),
+        # Company
+        "initial_company_website": values.get("initial_company_website"),
+        "initial_linkedin_url": values.get("initial_linkedin_url"),
+        "initial_address": values.get("initial_address"),
+        # Job
+        "initial_job_designation": values.get("initial_job_designation"),
         "initial_employment_type": values.get("initial_employment_type"),
         "initial_work_location": values.get("initial_work_location"),
+        # Eligibility
+        "initial_eligibility_cgpa": values.get("initial_eligibility_cgpa"),
+        "initial_eligibility_backlogs": values.get("initial_eligibility_backlogs"),
+        "initial_eligibility_other": values.get("initial_eligibility_other"),
+        # Branches
+        "initial_applicable_branches": values.get("initial_applicable_branches"),
+        # Compensation
         "initial_stipend": values.get("initial_stipend"),
         "initial_ctc": values.get("initial_ctc"),
-        "initial_eligibility": values.get("initial_eligibility"),
-        "initial_branches": values.get("initial_branches"),
+        # Process / Benefits
+        "initial_selection_process": values.get("initial_selection_process"),
+        "initial_bond": values.get("initial_bond"),
+        "initial_slp_duration": values.get("initial_slp_duration"),
+        "initial_other_benefits": values.get("initial_other_benefits"),
+        # Assignment
+        "initial_assignment_required": values.get("initial_assignment_required"),
+        "initial_assignment_link": values.get("initial_assignment_link"),
     }
 
 
@@ -202,9 +220,13 @@ async def _stream_response(thread_id: str, message: str):
     Async generator that:
       1. Invokes the assistant graph with astream_events.
       2. Yields SSE `data:` frames for each text token.
-      3. Saves user + assistant messages to the DB.
-      4. Yields a final `[DONE]` sentinel.
+      3. Keeps the connection alive with heartbeat comments during
+         long-running tool calls (e.g. initialize_workflow).
+      4. Saves user + assistant messages to the DB.
+      5. Yields a final `[DONE]` sentinel.
     """
+    import asyncio
+    import time
 
     graph = get_graph()
 
@@ -219,6 +241,8 @@ async def _stream_response(thread_id: str, message: str):
     }
 
     full_response = ""
+    last_heartbeat = time.monotonic()
+    HEARTBEAT_INTERVAL = 10  # seconds
 
     try:
         async for event in graph.astream_events(
@@ -226,7 +250,23 @@ async def _stream_response(thread_id: str, message: str):
             config=config,
             version="v2",
         ):
-            if event["event"] != "on_chat_model_stream":
+            # ── Heartbeat: keep SSE alive during slow tool calls ──
+            now = time.monotonic()
+            if now - last_heartbeat >= HEARTBEAT_INTERVAL:
+                yield ": heartbeat\n\n"  # SSE comment — ignored by parser, keeps TCP alive
+                last_heartbeat = now
+
+            event_name = event["event"]
+
+            # ── Tool start: let frontend know we're working ────────
+            if event_name == "on_tool_start":
+                tool_name = event.get("name", "")
+                if tool_name == "initialize_workflow":
+                    yield f"data: {json.dumps({'token': '⚙️ Running workflow…'})}\n\n"
+                    last_heartbeat = time.monotonic()
+                continue
+
+            if event_name != "on_chat_model_stream":
                 continue
 
             # Only stream tokens from the "assistant" node
@@ -247,6 +287,7 @@ async def _stream_response(thread_id: str, message: str):
             full_response += content
 
             yield f"data: {json.dumps({'token': content})}\n\n"
+            last_heartbeat = time.monotonic()
 
     except Exception as exc:
         yield f"data: {json.dumps({'error': str(exc)})}\n\n"

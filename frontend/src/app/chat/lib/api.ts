@@ -198,32 +198,64 @@ export interface AssistantStateResponse {
   initial_company_name: string | null;
   initial_form_template_name: string | null;
   initial_deadline: string | null;
-  initial_job_title: string[] | null;
+  // Company
+  initial_company_website: string | null;
+  initial_linkedin_url: string | null;
+  initial_address: string | null;
+  // Job
+  initial_job_designation: string[] | null;
   initial_employment_type: string | null;
   initial_work_location: string | null;
+  // Eligibility sub-fields
+  initial_eligibility_cgpa: string | null;
+  initial_eligibility_backlogs: string | null;
+  initial_eligibility_other: string | null;
+  // Branches
+  initial_applicable_branches: string | null;
+  // Compensation
   initial_stipend: string | null;
   initial_ctc: string | null;
-  initial_eligibility: string | null;
-  initial_branches: string | null;
+  // Process / Benefits
+  initial_selection_process: string[] | null;
+  initial_bond: string | null;
+  initial_slp_duration: string | null;
+  initial_other_benefits: string | null;
+  // Assignment
+  initial_assignment_required: boolean | null;
+  initial_assignment_link: string | null;
 }
 
 export interface EOIFields {
+  // Company
   company_name: string;
-  company_website?: string;
-  linkedin_link?: string;
-  job_title: string[];
-  employment_type?: string;
-  work_location?: string;
-  stipend?: string;
-  ctc?: string;
-  duration?: string;
-  eligibility?: string;
-  branches?: string;
-  job_description?: string;
-  selection_process?: string[];
-  other_benefits?: string;
+  company_website?: string | null;
+  linkedin_url?: string | null;
+  address?: string | null;
+  // Job
+  work_location?: string | null;
+  job_designation: string[];
+  employment_type?: string | null;
+  // Eligibility
+  eligibility_cgpa?: string | null;
+  eligibility_backlogs?: string | null;
+  eligibility_other?: string | null;
+  // Branches
+  applicable_branches?: string | null;
+  // Compensation
+  stipend?: string | null;
+  ctc?: string | null;
+  // Descriptions (extractor-only)
+  job_description?: string | null;
+  about_company?: string | null;
+  // Process / Benefits
+  selection_process?: string[] | null;
+  bond?: string | null;
+  slp_duration?: string | null;
+  other_benefits?: string | null;
+  // Assignment
   assignment_required: boolean;
-  assignment_link?: string;
+  assignment_deadline?: string | null;
+  assignment_link?: string | null;
 }
 
 export interface WorkflowStateResponse {

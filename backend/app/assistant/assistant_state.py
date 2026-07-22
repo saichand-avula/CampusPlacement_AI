@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Optional
 from typing_extensions import TypedDict, NotRequired
 from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
@@ -25,16 +25,35 @@ class AssistantState(TypedDict):
     initial_form_template_name: NotRequired[str | None]
     initial_additional_form_requirements: NotRequired[str | None]
 
-    # Optional company details provided or corrected by the user
+    # ── Company details ────────────────────────────────────────
     initial_company_website: NotRequired[str | None]
-    initial_linkedin_link: NotRequired[str | None]
+    initial_linkedin_url: NotRequired[str | None]
+    initial_address: NotRequired[str | None]
 
-    # Optional job details used to initialize the workflow
-    initial_job_title: NotRequired[list[str] | None]
+    # ── Job details ────────────────────────────────────────────
+    initial_job_designation: NotRequired[list[str] | None]
     initial_employment_type: NotRequired[str | None]
     initial_work_location: NotRequired[str | None]
+
+    # ── Eligibility (3 sub-fields) ─────────────────────────────
+    initial_eligibility_cgpa: NotRequired[str | None]
+    initial_eligibility_backlogs: NotRequired[str | None]
+    initial_eligibility_other: NotRequired[str | None]
+
+    # ── Branches ──────────────────────────────────────────────
+    initial_applicable_branches: NotRequired[str | None]
+
+    # ── Compensation ──────────────────────────────────────────
     initial_stipend: NotRequired[str | None]
     initial_ctc: NotRequired[str | None]
-    initial_duration: NotRequired[str | None]
-    initial_eligibility: NotRequired[str | None]
-    initial_branches: NotRequired[str | None]
+
+    # ── Process / Benefits (strict — only if explicitly mentioned) ──
+    initial_selection_process: NotRequired[list[str] | None]
+    initial_bond: NotRequired[str | None]
+    initial_slp_duration: NotRequired[str | None]
+    initial_other_benefits: NotRequired[str | None]
+
+    # ── Assignment ─────────────────────────────────────────────
+    initial_assignment_required: NotRequired[bool | None]
+    initial_assignment_link: NotRequired[str | None]
+    # NOTE: initial_assignment_deadline is NOT stored — it always equals initial_deadline

@@ -83,6 +83,61 @@ KEY RULES:
 - NEVER pass user_id to create_template - it is handled internally.
 
 ===========================================
+EOI FIELD REFERENCE — update_assistant_state PARAMETERS
+===========================================
+
+Use these exact parameter names when calling update_assistant_state:
+
+  CORE:
+    company_name          — hiring company name
+    deadline              — form/application deadline
+    jd_path               — path to JD file (set automatically on upload)
+    form_template_name    — Google Form template name
+    additional_form_requirements — extra form field instructions
+
+  COMPANY:
+    company_website       — official website URL
+    linkedin_url          — official LinkedIn page URL
+    address               — company physical address
+
+  JOB:
+    job_designation       — list of role names (e.g. ["SDE", "Data Analyst"])
+    employment_type       — MUST be exactly one of:
+                              "Internship"  (internship/SLP only)
+                              "FTE"         (full-time only)
+                              "SLP + FTE"   (internship with PPO/conversion)
+    work_location         — e.g. "Bangalore", "Remote", "Hybrid"
+
+  ELIGIBILITY (3 separate sub-fields):
+    eligibility_cgpa      — CGPA cutoff (e.g. "7.5") or "N/A"
+    eligibility_backlogs  — backlog policy (e.g. "No active backlogs") or "N/A"
+    eligibility_other     — other criteria or "N/A"
+
+  BRANCHES:
+    applicable_branches   — MUST be exactly one of:
+                              "CSE", "ECE", "AIDS",
+                              "CSE + ECE", "CSE + AIDS", "ECE + AIDS",
+                              "CSE + ECE + AIDS"
+
+  COMPENSATION:
+    stipend               — monthly stipend (text or number)
+    ctc                   — annual CTC (text or number)
+
+  PROCESS / BENEFITS (only set if explicitly mentioned — never assume):
+    selection_process     — ordered list of rounds (e.g. ["OA", "Technical", "HR"])
+    bond                  — bond clause if any
+    slp_duration          — internship duration (e.g. "6 months")
+    other_benefits        — perks like Early PPO, ESOPs, meal coupons, etc.
+
+  ASSIGNMENT:
+    assignment_required   — True or False
+    assignment_link       — assignment submission URL
+
+NOTE: job_description, about_company are NEVER set by the assistant.
+      They are extracted automatically from the JD.
+NOTE: assignment_deadline is NEVER set separately — it always equals the form deadline.
+
+===========================================
 AFTER TOOL CALLS
 ===========================================
 

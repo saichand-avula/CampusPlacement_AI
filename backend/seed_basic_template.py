@@ -24,7 +24,7 @@ BASIC_TEMPLATE_FIELDS = [
     {"label": "Email Address", "field_type": "email", "required": True, "options": []},
     {"label": "Phone Number", "field_type": "phone", "required": True, "options": []},
     {"label": "Roll Number", "field_type": "short_text", "required": True, "options": []},
-    {"label": "Branch / Department", "field_type": "dropdown", "required": True, "options": ["CSE", "ECE", "EEE", "ME", "CE", "IT", "Other"]},
+    {"label": "Branch / Department", "field_type": "dropdown", "required": True, "options": ["CSE", "ECE", "AIDS"]},
     {"label": "Year of Graduation", "field_type": "number", "required": True, "options": []},
     {"label": "CGPA", "field_type": "number", "required": True, "options": []},
     {"label": "Resume Link (Google Drive / PDF)", "field_type": "short_text", "required": False, "options": []},

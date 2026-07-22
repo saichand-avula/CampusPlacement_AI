@@ -22,6 +22,7 @@ function Badge({ children, color = "indigo" }: { children: React.ReactNode; colo
     sky: "bg-sky-500/15 text-sky-300 border-sky-500/30",
     rose: "bg-rose-500/15 text-rose-300 border-rose-500/30",
     violet: "bg-violet-500/15 text-violet-300 border-violet-500/30",
+    zinc: "bg-zinc-700/40 text-zinc-400 border-zinc-600/30",
   };
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-medium border ${colors[color] || colors.indigo}`}>
@@ -30,12 +31,26 @@ function Badge({ children, color = "indigo" }: { children: React.ReactNode; colo
   );
 }
 
+/** Always rendered — shows "—" (em-dash) when value is blank/null/undefined */
 function InfoRow({ label, value }: { label: string; value?: string | null }) {
-  if (!value) return null;
+  const display = value && value.trim() ? value : "—";
+  const isEmpty = display === "—";
   return (
     <div className="flex items-start gap-2 py-1.5 border-b border-zinc-800/50 last:border-0">
-      <span className="text-[11px] text-zinc-500 w-28 flex-shrink-0 pt-0.5">{label}</span>
-      <span className="text-[12px] text-zinc-200 flex-1 break-words">{value}</span>
+      <span className="text-[11px] text-zinc-500 w-32 flex-shrink-0 pt-0.5">{label}</span>
+      <span className={`text-[12px] flex-1 break-words ${isEmpty ? "text-zinc-600 italic" : "text-zinc-200"}`}>
+        {display}
+      </span>
+    </div>
+  );
+}
+
+/** Section divider */
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 pt-3 pb-1.5">
+      <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{children}</span>
+      <div className="flex-1 h-px bg-zinc-800/80" />
     </div>
   );
 }
@@ -61,6 +76,18 @@ function LinkButton({ href, label, icon }: { href: string; label: string; icon: 
     </a>
   );
 }
+
+const FIELD_TYPE_ICONS: Record<string, string> = {
+  short_text: "Aa",
+  paragraph: "¶",
+  email: "@",
+  number: "#",
+  phone: "☎",
+  date: "📅",
+  dropdown: "▾",
+  multiple_choice: "◉",
+  checkboxes: "☑",
+};
 
 export default function WorkflowStatePanel({ state }: WorkflowStatePanelProps) {
   const [expanded, setExpanded] = useState(true);
@@ -120,7 +147,7 @@ export default function WorkflowStatePanel({ state }: WorkflowStatePanelProps) {
             <div className="flex flex-wrap gap-1.5 mt-1">
               {eoi.employment_type && <Badge color="sky">{eoi.employment_type}</Badge>}
               {eoi.work_location && <Badge color="violet">{eoi.work_location}</Badge>}
-              {eoi.job_title?.slice(0, 2).map((t) => (
+              {eoi.job_designation?.slice(0, 2).map((t) => (
                 <Badge key={t} color="indigo">{t}</Badge>
               ))}
             </div>
@@ -153,45 +180,83 @@ export default function WorkflowStatePanel({ state }: WorkflowStatePanelProps) {
           </div>
 
           {/* Tab content */}
-          <div className="px-4 py-3 max-h-80 overflow-y-auto scrollbar-thin">
+          <div className="px-4 py-3 max-h-[480px] overflow-y-auto scrollbar-thin">
 
             {/* ─ Overview tab ─ */}
             {activeTab === "overview" && eoi && (
               <div>
-                <InfoRow label="Company" value={eoi.company_name} />
-                <InfoRow label="Job Title(s)" value={eoi.job_title?.join(", ")} />
-                <InfoRow label="Employment" value={eoi.employment_type} />
-                <InfoRow label="Location" value={eoi.work_location} />
+                {/* Company */}
+                <SectionLabel>Company</SectionLabel>
+                <InfoRow label="Company Name" value={eoi.company_name} />
+                <InfoRow label="Website" value={eoi.company_website} />
+                <InfoRow label="LinkedIn" value={eoi.linkedin_url} />
+                <InfoRow label="Address" value={eoi.address} />
+
+                {/* Job */}
+                <SectionLabel>Job</SectionLabel>
+                <InfoRow label="Designation(s)" value={eoi.job_designation?.join(", ")} />
+                <InfoRow label="Employment Type" value={eoi.employment_type} />
+                <InfoRow label="Work Location" value={eoi.work_location} />
+                <InfoRow label="Applicable Branches" value={eoi.applicable_branches} />
+
+                {/* Compensation */}
+                <SectionLabel>Compensation</SectionLabel>
                 <InfoRow label="Stipend" value={eoi.stipend} />
                 <InfoRow label="CTC" value={eoi.ctc} />
-                <InfoRow label="Duration" value={eoi.duration} />
-                <InfoRow label="Deadline" value={state.deadline} />
-                <InfoRow label="Eligibility" value={eoi.eligibility} />
-                <InfoRow label="Branches" value={eoi.branches} />
-                <InfoRow label="Website" value={eoi.company_website} />
-                <InfoRow label="Benefits" value={eoi.other_benefits} />
-                {eoi.selection_process && eoi.selection_process.length > 0 && (
-                  <div className="py-1.5 border-b border-zinc-800/50">
-                    <span className="text-[11px] text-zinc-500 block mb-1.5">Selection Process</span>
-                    <div className="flex flex-wrap gap-1.5">
+                <InfoRow label="SLP Duration" value={eoi.slp_duration} />
+                <InfoRow label="Other Benefits" value={eoi.other_benefits} />
+                <InfoRow label="Bond" value={eoi.bond} />
+
+                {/* Eligibility */}
+                <SectionLabel>Eligibility</SectionLabel>
+                <InfoRow label="CGPA" value={eoi.eligibility_cgpa} />
+                <InfoRow label="Backlogs" value={eoi.eligibility_backlogs} />
+                <InfoRow label="Other" value={eoi.eligibility_other} />
+
+                {/* Descriptions */}
+                <SectionLabel>Descriptions</SectionLabel>
+                <InfoRow label="About Company" value={eoi.about_company} />
+                <InfoRow label="Job Description" value={eoi.job_description} />
+
+                {/* Process */}
+                <SectionLabel>Process</SectionLabel>
+                <div className="py-1.5 border-b border-zinc-800/50">
+                  <span className="text-[11px] text-zinc-500 w-32 inline-block pt-0.5">Selection Process</span>
+                  {eoi.selection_process && eoi.selection_process.length > 0 ? (
+                    <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1">
                       {eoi.selection_process.map((round, i) => (
                         <span key={i} className="flex items-center gap-1 text-[11px] text-zinc-300">
-                          <span className="text-zinc-600">{i + 1}.</span> {round}
+                          <span className="text-zinc-600 font-mono">{i + 1}.</span> {round}
                         </span>
                       ))}
                     </div>
+                  ) : (
+                    <span className="text-[12px] text-zinc-600 italic">—</span>
+                  )}
+                </div>
+                <InfoRow label="Deadline" value={state.deadline} />
+
+                {/* Assignment */}
+                <SectionLabel>Assignment</SectionLabel>
+                <div className="flex items-start gap-2 py-1.5 border-b border-zinc-800/50">
+                  <span className="text-[11px] text-zinc-500 w-32 flex-shrink-0 pt-0.5">Required</span>
+                  {eoi.assignment_required ? (
+                    <Badge color="amber">Yes — Assignment Required</Badge>
+                  ) : (
+                    <span className="text-[12px] text-zinc-600 italic">No</span>
+                  )}
+                </div>
+                <InfoRow label="Deadline" value={eoi.assignment_deadline} />
+                {eoi.assignment_link ? (
+                  <div className="flex items-start gap-2 py-1.5 border-b border-zinc-800/50">
+                    <span className="text-[11px] text-zinc-500 w-32 flex-shrink-0 pt-0.5">Link</span>
+                    <a href={eoi.assignment_link} target="_blank" rel="noopener noreferrer"
+                      className="text-xs text-indigo-400 hover:underline truncate flex-1">
+                      {eoi.assignment_link}
+                    </a>
                   </div>
-                )}
-                {eoi.assignment_required && (
-                  <div className="py-1.5">
-                    <Badge color="amber">Assignment Required</Badge>
-                    {eoi.assignment_link && (
-                      <a href={eoi.assignment_link} target="_blank" rel="noopener noreferrer"
-                        className="ml-2 text-xs text-indigo-400 hover:underline truncate">
-                        {eoi.assignment_link}
-                      </a>
-                    )}
-                  </div>
+                ) : (
+                  <InfoRow label="Link" value={null} />
                 )}
               </div>
             )}
@@ -200,17 +265,36 @@ export default function WorkflowStatePanel({ state }: WorkflowStatePanelProps) {
             {activeTab === "form" && (
               <div>
                 {state.form_fields && Array.isArray(state.form_fields) && state.form_fields.length > 0 ? (
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     {(state.form_fields as FormFieldItem[]).map((field, i) => (
                       <div key={i}
-                        className="flex items-center justify-between py-1.5 border-b border-zinc-800/40 last:border-0">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span className="text-xs text-zinc-200 truncate">{field.label}</span>
-                          {field.required && (
-                            <span className="text-[10px] text-rose-400 flex-shrink-0">*</span>
-                          )}
+                        className="rounded-lg border border-zinc-800/60 bg-zinc-800/20 px-3 py-2.5">
+                        {/* Field header row */}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {field.required && (
+                              <span className="text-[10px] text-rose-400 flex-shrink-0 font-bold">*</span>
+                            )}
+                            <span className="text-[12px] text-zinc-200 font-medium truncate">{field.label}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <span className="text-[10px] text-zinc-500 font-mono">
+                              {FIELD_TYPE_ICONS[field.field_type] ?? "?"}
+                            </span>
+                            <Badge color="violet">{field.field_type}</Badge>
+                          </div>
                         </div>
-                        <Badge color="violet">{field.field_type}</Badge>
+                        {/* Options (for dropdown / multiple_choice / checkboxes) */}
+                        {field.options && field.options.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-1">
+                            {field.options.map((opt, j) => (
+                              <span key={j}
+                                className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-700/40 text-zinc-400 border border-zinc-700/40">
+                                {opt}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>

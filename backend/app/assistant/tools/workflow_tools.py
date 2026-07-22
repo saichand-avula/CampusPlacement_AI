@@ -22,7 +22,7 @@ async def check_workflow_status(
     """
     Checks whether the placement workflow has been initialized and
     returns a summary of all current placement state values collected
-    so far (company, deadline, template, job details, etc.).
+    so far (company, deadline, template, job details, eligibility, etc.).
 
     Call this when:
     - The user asks whether the workflow is initialized.
@@ -38,21 +38,38 @@ async def check_workflow_status(
     ]
 
     fields = {
+        # Core
         "Company Name":               state.get("initial_company_name"),
         "Deadline":                   state.get("initial_deadline"),
         "JD Path":                    state.get("initial_jd_path"),
         "Form Template":              state.get("initial_form_template_name"),
         "Additional Form Reqs":       state.get("initial_additional_form_requirements"),
+        # Company
         "Company Website":            state.get("initial_company_website"),
-        "LinkedIn":                   state.get("initial_linkedin_link"),
-        "Job Title(s)":               state.get("initial_job_title"),
+        "LinkedIn URL":               state.get("initial_linkedin_url"),
+        "Address":                    state.get("initial_address"),
+        # Job
+        "Job Designation(s)":         state.get("initial_job_designation"),
         "Employment Type":            state.get("initial_employment_type"),
         "Work Location":              state.get("initial_work_location"),
+        # Eligibility
+        "Eligibility — CGPA":         state.get("initial_eligibility_cgpa"),
+        "Eligibility — Backlogs":     state.get("initial_eligibility_backlogs"),
+        "Eligibility — Other":        state.get("initial_eligibility_other"),
+        # Branches
+        "Applicable Branches":        state.get("initial_applicable_branches"),
+        # Compensation
         "Stipend":                    state.get("initial_stipend"),
         "CTC":                        state.get("initial_ctc"),
-        "Duration":                   state.get("initial_duration"),
-        "Eligibility":                state.get("initial_eligibility"),
-        "Branches":                   state.get("initial_branches"),
+        # Process / Benefits
+        "Selection Process":          state.get("initial_selection_process"),
+        "Bond":                       state.get("initial_bond"),
+        "SLP Duration":               state.get("initial_slp_duration"),
+        "Other Benefits":             state.get("initial_other_benefits"),
+        # Assignment
+        "Assignment Required":        state.get("initial_assignment_required"),
+        "Assignment Link":            state.get("initial_assignment_link"),
+        # Note: assignment_deadline always equals deadline — not stored separately
     }
 
     for label, value in fields.items():
@@ -70,28 +87,44 @@ async def check_workflow_status(
 async def update_assistant_state(
     tool_call_id: Annotated[str, InjectedToolCallId],
     state: Annotated[AssistantState, InjectedState],
+    # Core
     company_name: Optional[str] = None,
     deadline: Optional[str] = None,
     jd_path: Optional[str] = None,
     form_template_name: Optional[str] = None,
     additional_form_requirements: Optional[str] = None,
+    # Company
     company_website: Optional[str] = None,
-    linkedin_link: Optional[str] = None,
-    job_title: Optional[list[str]] = None,
+    linkedin_url: Optional[str] = None,
+    address: Optional[str] = None,
+    # Job
+    job_designation: Optional[list[str]] = None,
     employment_type: Optional[str] = None,
     work_location: Optional[str] = None,
+    # Eligibility sub-fields
+    eligibility_cgpa: Optional[str] = None,
+    eligibility_backlogs: Optional[str] = None,
+    eligibility_other: Optional[str] = None,
+    # Branches
+    applicable_branches: Optional[str] = None,
+    # Compensation
     stipend: Optional[str] = None,
     ctc: Optional[str] = None,
-    duration: Optional[str] = None,
-    eligibility: Optional[str] = None,
-    branches: Optional[str] = None,
+    # Process / Benefits
+    selection_process: Optional[list[str]] = None,
+    bond: Optional[str] = None,
+    slp_duration: Optional[str] = None,
+    other_benefits: Optional[str] = None,
+    # Assignment
+    assignment_required: Optional[bool] = None,
+    assignment_link: Optional[str] = None,
 ) -> Command:
     """
     Updates one or more placement workflow state values.
     Only works when the workflow has NOT been initialized yet.
 
     Use this whenever the user provides or corrects placement details
-    such as company name, deadline, form template, job info, etc.
+    such as company name, deadline, form template, job info, eligibility, etc.
 
     Do NOT call this if the workflow is already initialized — instead,
     inform the user that changes after initialization need different handling.
@@ -103,15 +136,23 @@ async def update_assistant_state(
         form_template_name: Google Form template name (e.g. "basic template").
         additional_form_requirements: Extra form field requirements.
         company_website: Company's official website URL.
-        linkedin_link: LinkedIn job post or company page URL.
-        job_title: List of job roles (e.g. ["SDE", "Data Analyst"]).
-        employment_type: e.g. "Full-Time", "Internship".
+        linkedin_url: Company's official LinkedIn page URL.
+        address: Company's physical address or office location.
+        job_designation: List of job roles/designations (e.g. ["SDE", "Data Analyst"]).
+        employment_type: One of "Internship", "FTE", or "SLP + FTE".
         work_location: e.g. "Remote", "Bangalore", "Hybrid".
-        stipend: Monthly stipend amount (for internships).
-        ctc: Annual CTC package (for full-time roles).
-        duration: Internship / contract duration.
-        eligibility: Eligibility criteria.
-        branches: Eligible branches or departments.
+        eligibility_cgpa: Minimum CGPA requirement (e.g. "7.0", "N/A").
+        eligibility_backlogs: Backlog policy (e.g. "No active backlogs", "N/A").
+        eligibility_other: Other eligibility criteria not covered by CGPA/backlogs.
+        applicable_branches: Eligible branches — only CSE, ECE, AIDS combinations.
+        stipend: Monthly stipend amount (for internships); can be text.
+        ctc: Annual CTC package (for full-time roles); can be text.
+        selection_process: Ordered list of hiring rounds.
+        bond: Bond/service agreement clause if any.
+        slp_duration: Internship/SLP duration (e.g. "6 months").
+        other_benefits: Additional perks (e.g. Early PPO, ESOPs, meal coupons).
+        assignment_required: Whether an assignment is required (True/False).
+        assignment_link: Assignment or assessment submission URL.
     """
     initialized = state.get("workflow_initialized", False)
 
@@ -133,6 +174,7 @@ async def update_assistant_state(
     updates: dict = {}
     updated_fields: list[str] = []
 
+    # ── Core ──────────────────────────────────────────────────
     if company_name is not None:
         updates["initial_company_name"] = company_name
         updated_fields.append(f"Company Name → {company_name}")
@@ -153,17 +195,23 @@ async def update_assistant_state(
         updates["initial_additional_form_requirements"] = additional_form_requirements
         updated_fields.append(f"Additional Form Reqs → {additional_form_requirements}")
 
+    # ── Company ───────────────────────────────────────────────
     if company_website is not None:
         updates["initial_company_website"] = company_website
         updated_fields.append(f"Company Website → {company_website}")
 
-    if linkedin_link is not None:
-        updates["initial_linkedin_link"] = linkedin_link
-        updated_fields.append(f"LinkedIn → {linkedin_link}")
+    if linkedin_url is not None:
+        updates["initial_linkedin_url"] = linkedin_url
+        updated_fields.append(f"LinkedIn URL → {linkedin_url}")
 
-    if job_title is not None:
-        updates["initial_job_title"] = job_title
-        updated_fields.append(f"Job Title(s) → {', '.join(job_title)}")
+    if address is not None:
+        updates["initial_address"] = address
+        updated_fields.append(f"Address → {address}")
+
+    # ── Job ───────────────────────────────────────────────────
+    if job_designation is not None:
+        updates["initial_job_designation"] = job_designation
+        updated_fields.append(f"Job Designation(s) → {', '.join(job_designation)}")
 
     if employment_type is not None:
         updates["initial_employment_type"] = employment_type
@@ -173,6 +221,25 @@ async def update_assistant_state(
         updates["initial_work_location"] = work_location
         updated_fields.append(f"Work Location → {work_location}")
 
+    # ── Eligibility ───────────────────────────────────────────
+    if eligibility_cgpa is not None:
+        updates["initial_eligibility_cgpa"] = eligibility_cgpa
+        updated_fields.append(f"Eligibility CGPA → {eligibility_cgpa}")
+
+    if eligibility_backlogs is not None:
+        updates["initial_eligibility_backlogs"] = eligibility_backlogs
+        updated_fields.append(f"Eligibility Backlogs → {eligibility_backlogs}")
+
+    if eligibility_other is not None:
+        updates["initial_eligibility_other"] = eligibility_other
+        updated_fields.append(f"Eligibility Other → {eligibility_other}")
+
+    # ── Branches ──────────────────────────────────────────────
+    if applicable_branches is not None:
+        updates["initial_applicable_branches"] = applicable_branches
+        updated_fields.append(f"Applicable Branches → {applicable_branches}")
+
+    # ── Compensation ──────────────────────────────────────────
     if stipend is not None:
         updates["initial_stipend"] = stipend
         updated_fields.append(f"Stipend → {stipend}")
@@ -181,17 +248,31 @@ async def update_assistant_state(
         updates["initial_ctc"] = ctc
         updated_fields.append(f"CTC → {ctc}")
 
-    if duration is not None:
-        updates["initial_duration"] = duration
-        updated_fields.append(f"Duration → {duration}")
+    # ── Process / Benefits ────────────────────────────────────
+    if selection_process is not None:
+        updates["initial_selection_process"] = selection_process
+        updated_fields.append(f"Selection Process → {' → '.join(selection_process)}")
 
-    if eligibility is not None:
-        updates["initial_eligibility"] = eligibility
-        updated_fields.append(f"Eligibility → {eligibility}")
+    if bond is not None:
+        updates["initial_bond"] = bond
+        updated_fields.append(f"Bond → {bond}")
 
-    if branches is not None:
-        updates["initial_branches"] = branches
-        updated_fields.append(f"Branches → {branches}")
+    if slp_duration is not None:
+        updates["initial_slp_duration"] = slp_duration
+        updated_fields.append(f"SLP Duration → {slp_duration}")
+
+    if other_benefits is not None:
+        updates["initial_other_benefits"] = other_benefits
+        updated_fields.append(f"Other Benefits → {other_benefits}")
+
+    # ── Assignment ────────────────────────────────────────────
+    if assignment_required is not None:
+        updates["initial_assignment_required"] = assignment_required
+        updated_fields.append(f"Assignment Required → {assignment_required}")
+
+    if assignment_link is not None:
+        updates["initial_assignment_link"] = assignment_link
+        updated_fields.append(f"Assignment Link → {assignment_link}")
 
     if not updates:
         return Command(
@@ -246,7 +327,7 @@ async def initialize_workflow(
          c. If neither exists, asks the user to create/choose a template.
       3. Verifies the resolved template exists for this user in the store.
          If the name is given by user but not found, asks user to create it first.
-      4. Maps all initial_* fields from AssistantState → mystate.
+      4. Maps all initial_* fields from AssistantState → mystate (as preset_* fields).
       5. Invokes the workflow graph using the same thread_id as the assistant.
       6. Sets workflow_initialized = True.
 
@@ -330,26 +411,40 @@ async def initialize_workflow(
         )
 
     # ── Build workflow input (AssistantState → mystate) ───────
-    # Core fields
     workflow_input: dict = {
+        # Core
         "user_id": user_id,
         "thread_id": thread_id,
         "jd_path": jd_path,
         "deadline": state.get("initial_deadline") or "",
         "form_template_name": template_name,
         "additional_form_requirements": state.get("initial_additional_form_requirements") or "",
-        # Pass user-provided values as preset_* so EOI extractor respects them
-        "preset_company_name": state.get("initial_company_name"),
-        "preset_job_title": state.get("initial_job_title"),
-        "preset_employment_type": state.get("initial_employment_type"),
-        "preset_work_location": state.get("initial_work_location"),
-        "preset_stipend": state.get("initial_stipend"),
-        "preset_ctc": state.get("initial_ctc"),
-        "preset_duration": state.get("initial_duration"),
-        "preset_eligibility": state.get("initial_eligibility"),
-        "preset_branches": state.get("initial_branches"),
-        "preset_company_website": state.get("initial_company_website"),
-        "preset_linkedin_link": state.get("initial_linkedin_link"),
+        # Company presets
+        "preset_company_name":      state.get("initial_company_name"),
+        "preset_company_website":   state.get("initial_company_website"),
+        "preset_linkedin_url":      state.get("initial_linkedin_url"),
+        "preset_address":           state.get("initial_address"),
+        # Job presets
+        "preset_job_designation":   state.get("initial_job_designation"),
+        "preset_employment_type":   state.get("initial_employment_type"),
+        "preset_work_location":     state.get("initial_work_location"),
+        # Eligibility presets
+        "preset_eligibility_cgpa":      state.get("initial_eligibility_cgpa"),
+        "preset_eligibility_backlogs":  state.get("initial_eligibility_backlogs"),
+        "preset_eligibility_other":     state.get("initial_eligibility_other"),
+        # Branches
+        "preset_applicable_branches":   state.get("initial_applicable_branches"),
+        # Compensation
+        "preset_stipend":           state.get("initial_stipend"),
+        "preset_ctc":               state.get("initial_ctc"),
+        # Process / Benefits
+        "preset_selection_process": state.get("initial_selection_process"),
+        "preset_bond":              state.get("initial_bond"),
+        "preset_slp_duration":      state.get("initial_slp_duration"),
+        "preset_other_benefits":    state.get("initial_other_benefits"),
+        # Assignment
+        "preset_assignment_required": state.get("initial_assignment_required"),
+        "preset_assignment_link":     state.get("initial_assignment_link"),
     }
 
     # ── Run workflow graph ─────────────────────────────────────
